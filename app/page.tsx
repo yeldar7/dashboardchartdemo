@@ -1,33 +1,37 @@
-"use client"
+'use client'
 
 import React, { useState, useEffect } from "react"
-import { Calendar } from "@/components/ui/calendar"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { format, parse, setHours, setMinutes } from "date-fns"
+import { format, subDays, subMonths, subYears } from "date-fns"
 import { Moon, Sun } from "lucide-react"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import ReactECharts from 'echarts-for-react'
+import { DateRangePicker } from "@/components/ui/date-range-picker"
+import { DateRange } from "react-day-picker"
+
+interface StockData {
+  date: string;
+  open: number;
+  close: number;
+  low: number;
+  high: number;
+}
 
 export default function Page() {
-  const [date, setDate] = useState<Date | undefined>(new Date())
   const [darkMode, setDarkMode] = useState(false)
   const currentDate = new Date()
-  const [stockData, setStockData] = useState([])
+  const [stockData, setStockData] = useState<StockData[]>([])
   const [stockTicker, setStockTicker] = useState('')
-  const [timeFrame, setTimeFrame] = useState('1d')
-  const [showCalendar, setShowCalendar] = useState(false)
+  const [timeRange, setTimeRange] = useState('1d')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [dateRange, setDateRange] = useState<{ from: Date | null; to: Date | null }>({
-    from: null,
-    to: null,
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: subDays(new Date(), 1),
+    to: new Date(),
   })
-  const [startTime, setStartTime] = useState("09:00")
-  const [endTime, setEndTime] = useState("16:00")
 
   useEffect(() => {
     if (darkMode) {
@@ -37,53 +41,69 @@ export default function Page() {
     }
   }, [darkMode])
 
+  useEffect(() => {
+    console.log('Stock data updated:', stockData)
+  }, [stockData])
+
   const handleStockSearch = async (e: React.FormEvent) => {
     e.preventDefault()
     if (stockTicker) {
-      await fetchStockData(stockTicker, timeFrame)
+      await fetchStockData()
     }
   }
 
-  const handleTimeFrameSelect = async (value: string) => {
-    setTimeFrame(value)
-    if (value === 'custom') {
-      setShowCalendar(true)
-    } else {
-      setShowCalendar(false)
-      if (stockTicker) {
-        await fetchStockData(stockTicker, value)
-      }
+  const handleTimeRangeSelect = (value: string) => {
+    setTimeRange(value)
+    const to = new Date()
+    let from: Date
+
+    switch (value) {
+      case '1d':
+        from = subDays(to, 1)
+        break
+      case '1w':
+        from = subDays(to, 7)
+        break
+      case '1m':
+        from = subMonths(to, 1)
+        break
+      case '3m':
+        from = subMonths(to, 3)
+        break
+      case '6m':
+        from = subMonths(to, 6)
+        break
+      case '1y':
+        from = subYears(to, 1)
+        break
+      case '5y':
+        from = subYears(to, 5)
+        break
+      default:
+        from = subDays(to, 1)
     }
+
+    setDateRange({ from, to })
   }
 
-  const fetchStockData = async (ticker: string, period: string) => {
+  const fetchStockData = async () => {
     setIsLoading(true)
     setError(null)
     try {
-      let url = `/api/stock?symbol=${ticker}&period=${period}`
-      if (period === 'custom' && dateRange.from && dateRange.to) {
-        const fromDate = setMinutes(setHours(dateRange.from, parseInt(startTime.split(':')[0])), parseInt(startTime.split(':')[1]))
-        const toDate = setMinutes(setHours(dateRange.to, parseInt(endTime.split(':')[0])), parseInt(endTime.split(':')[1]))
-        url += `&from=${fromDate.toISOString()}&to=${toDate.toISOString()}`
-      }
+      const url = `/api/stock?symbol=${stockTicker}&from=${dateRange?.from?.toISOString()}&to=${dateRange?.to?.toISOString()}`
       console.log('Fetching data from:', url)
       const response = await fetch(url)
       if (!response.ok) {
         const errorData = await response.json()
         throw new Error(errorData.error || 'Failed to fetch stock data')
       }
-      const data = await response.json()
+      const data: StockData[] = await response.json()
       console.log('Received data:', data)
       if (!Array.isArray(data) || data.length === 0) {
         throw new Error('No data received from the server')
       }
-      setStockData(data.map((item: any) => [
-        format(new Date(item.date), 'yyyy-MM-dd HH:mm'),
-        item.open,
-        item.close,
-        item.low,
-        item.high
-      ]))
+      setStockData(data)
+      console.log('Stock data set:', data)
     } catch (error) {
       console.error('Error fetching stock data:', error)
       setError(error instanceof Error ? error.message : 'An unknown error occurred')
@@ -92,68 +112,60 @@ export default function Page() {
     }
   }
 
-  const generateTimeOptions = () => {
-    const options = []
-    for (let hour = 0; hour < 24; hour++) {
-      for (let minute = 0; minute < 60; minute += 30) {
-        const time = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
-        options.push(<SelectItem key={time} value={time}>{time}</SelectItem>)
-      }
-    }
-    return options
-  }
-
-  const getChartOptions = () => ({
-    tooltip: {
-      trigger: 'axis',
-      axisPointer: {
-        type: 'cross'
-      }
-    },
-    xAxis: {
-      type: 'category',
-      data: stockData.map(item => item[0]),
-      scale: true,
-      boundaryGap: false,
-      axisLine: { onZero: false },
-      splitLine: { show: false },
-      min: 'dataMin',
-      max: 'dataMax'
-    },
-    yAxis: {
-      scale: true,
-      splitArea: {
-        show: true
-      }
-    },
-    dataZoom: [
-      {
-        type: 'inside',
-        start: 0,
-        end: 100
-      },
-      {
-        show: true,
-        type: 'slider',
-        top: '90%',
-        start: 0,
-        end: 100
-      }
-    ],
-    series: [
-      {
-        name: 'Candlestick',
-        type: 'candlestick',
-        data: stockData,
-        itemStyle: {
-          color: 'hsl(var(--success))',
-          color0: 'hsl(var(--destructive))',
-          borderColor: 'hsl(var(--success))',
-          borderColor0: 'hsl(var(--destructive))'
+  const getChartOptions = () => {
+    console.log('Generating chart options with data:', stockData)
+    return {
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: {
+          type: 'cross'
         }
-      }
-    ]
-  })
+      },
+      xAxis: {
+        type: 'category',
+        data: stockData.map(item => format(new Date(item.date), 'yyyy-MM-dd HH:mm')),
+        scale: true,
+        boundaryGap: false,
+        axisLine: { onZero: false },
+        splitLine: { show: false },
+        min: 'dataMin',
+        max: 'dataMax'
+      },
+      yAxis: {
+        scale: true,
+        splitArea: {
+          show: true
+        }
+      },
+      dataZoom: [
+        {
+          type: 'inside',
+          start: 0,
+          end: 100
+        },
+        {
+          show: true,
+          type: 'slider',
+          top: '90%',
+          start: 0,
+          end: 100
+        }
+      ],
+      series: [
+        {
+          name: 'Stock Price',
+          type: 'candlestick',
+          data: stockData.map(item => [item.open, item.close, item.low, item.high]),
+          itemStyle: {
+            color: 'hsl(var(--success))',
+            color0: 'hsl(var(--destructive))',
+            borderColor: 'hsl(var(--success))',
+            borderColor0: 'hsl(var(--destructive))'
+          }
+        }
+      ]
+    }
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
@@ -192,65 +204,29 @@ export default function Page() {
               </Button>
             </form>
             <div className="mt-4">
-              <Select onValueChange={handleTimeFrameSelect} defaultValue={timeFrame}>
+              <Select onValueChange={handleTimeRangeSelect} defaultValue={timeRange}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select time frame" />
+                  <SelectValue placeholder="Select time range" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="5m">5 minutes</SelectItem>
-                  <SelectItem value="15m">15 minutes</SelectItem>
-                  <SelectItem value="30m">30 minutes</SelectItem>
-                  <SelectItem value="1h">1 hour</SelectItem>
-                  <SelectItem value="1d">1 day</SelectItem>
-                  <SelectItem value="5d">5 days</SelectItem>
-                  <SelectItem value="1mo">1 month</SelectItem>
-                  <SelectItem value="custom">Custom</SelectItem>
+                  <SelectItem value="1d">1 Day</SelectItem>
+                  <SelectItem value="1w">1 Week</SelectItem>
+                  <SelectItem value="1m">1 Month</SelectItem>
+                  <SelectItem value="3m">3 Months</SelectItem>
+                  <SelectItem value="6m">6 Months</SelectItem>
+                  <SelectItem value="1y">1 Year</SelectItem>
+                  <SelectItem value="5y">5 Years</SelectItem>
+                  <SelectItem value="custom">Custom Range</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            {showCalendar && (
-              <>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full mt-4">
-                      {dateRange.from && dateRange.to ? (
-                        <>
-                          {format(dateRange.from, "LLL dd, y")} -{" "}
-                          {format(dateRange.to, "LLL dd, y")}
-                        </>
-                      ) : (
-                        <span>Pick a date range</span>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="range"
-                      selected={dateRange}
-                      onSelect={(range) => setDateRange(range)}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-                <div className="flex justify-between mt-4">
-                  <Select onValueChange={setStartTime} defaultValue={startTime}>
-                    <SelectTrigger className="w-[120px]">
-                      <SelectValue placeholder="Start Time" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {generateTimeOptions()}
-                    </SelectContent>
-                  </Select>
-                  <Select onValueChange={setEndTime} defaultValue={endTime}>
-                    <SelectTrigger className="w-[120px]">
-                      <SelectValue placeholder="End Time" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {generateTimeOptions()}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </>
+            {timeRange === 'custom' && (
+              <div className="mt-4">
+                <DateRangePicker
+                  dateRange={dateRange}
+                  onDateRangeChange={setDateRange}
+                />
+              </div>
             )}
           </CardContent>
         </Card>
@@ -271,6 +247,8 @@ export default function Page() {
                   option={getChartOptions()}
                   style={{ height: '100%', width: '100%' }}
                   theme={darkMode ? 'dark' : undefined}
+                  notMerge={true}
+                  lazyUpdate={false}
                 />
               </div>
             ) : (
