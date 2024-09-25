@@ -12,7 +12,7 @@ import { Moon, Sun } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import ReactECharts from 'echarts-for-react'
 
-export default function Page() {
+export function PageComponent() {
   const [date, setDate] = useState<Date | undefined>(new Date())
   const [darkMode, setDarkMode] = useState(false)
   const currentDate = new Date()

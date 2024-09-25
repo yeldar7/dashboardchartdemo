@@ -8,11 +8,11 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { format, parse, setHours, setMinutes } from "date-fns"
+import { CandlestickChart, Candlestick, XAxis, YAxis, Tooltip } from 'recharts'
 import { Moon, Sun } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import ReactECharts from 'echarts-for-react'
 
-export default function Page() {
+export function PageComponent() {
   const [date, setDate] = useState<Date | undefined>(new Date())
   const [darkMode, setDarkMode] = useState(false)
   const currentDate = new Date()
@@ -77,13 +77,13 @@ export default function Page() {
       if (!Array.isArray(data) || data.length === 0) {
         throw new Error('No data received from the server')
       }
-      setStockData(data.map((item: any) => [
-        format(new Date(item.date), 'yyyy-MM-dd HH:mm'),
-        item.open,
-        item.close,
-        item.low,
-        item.high
-      ]))
+      setStockData(data.map((item: any) => ({
+        date: format(new Date(item.date), 'MMM dd HH:mm'),
+        open: item.open,
+        high: item.high,
+        low: item.low,
+        close: item.close
+      })))
     } catch (error) {
       console.error('Error fetching stock data:', error)
       setError(error instanceof Error ? error.message : 'An unknown error occurred')
@@ -102,58 +102,6 @@ export default function Page() {
     }
     return options
   }
-
-  const getChartOptions = () => ({
-    tooltip: {
-      trigger: 'axis',
-      axisPointer: {
-        type: 'cross'
-      }
-    },
-    xAxis: {
-      type: 'category',
-      data: stockData.map(item => item[0]),
-      scale: true,
-      boundaryGap: false,
-      axisLine: { onZero: false },
-      splitLine: { show: false },
-      min: 'dataMin',
-      max: 'dataMax'
-    },
-    yAxis: {
-      scale: true,
-      splitArea: {
-        show: true
-      }
-    },
-    dataZoom: [
-      {
-        type: 'inside',
-        start: 0,
-        end: 100
-      },
-      {
-        show: true,
-        type: 'slider',
-        top: '90%',
-        start: 0,
-        end: 100
-      }
-    ],
-    series: [
-      {
-        name: 'Candlestick',
-        type: 'candlestick',
-        data: stockData,
-        itemStyle: {
-          color: 'hsl(var(--success))',
-          color0: 'hsl(var(--destructive))',
-          borderColor: 'hsl(var(--success))',
-          borderColor0: 'hsl(var(--destructive))'
-        }
-      }
-    ]
-  })
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
@@ -267,11 +215,32 @@ export default function Page() {
               <p>Loading...</p>
             ) : stockData.length > 0 ? (
               <div className="h-[400px] w-full">
-                <ReactECharts
-                  option={getChartOptions()}
-                  style={{ height: '100%', width: '100%' }}
-                  theme={darkMode ? 'dark' : undefined}
-                />
+                <CandlestickChart
+                  width={600}
+                  height={400}
+                  data={stockData}
+                  margin={{
+                    top: 20,
+                    right: 30,
+                    left: 40,
+                    bottom: 5,
+                  }}
+                >
+                  <XAxis dataKey="date" />
+                  <YAxis domain={['auto', 'auto']} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'hsl(var(--background))',
+                      border: '1px solid hsl(var(--border))',
+                      color: 'hsl(var(--foreground))'
+                    }}
+                  />
+                  <Candlestick
+                    yAccessor={(d) => [d.open, d.high, d.low, d.close]}
+                    stroke="#000"
+                    fill={(d) => (d.close > d.open ? '#26a69a' : '#ef5350')}
+                  />
+                </CandlestickChart>
               </div>
             ) : (
               <p>No data available. Please search for a stock ticker.</p>
