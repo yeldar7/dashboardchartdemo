@@ -67,18 +67,6 @@ export default function Page() {
       case '1m':
         from = subMonths(to, 1)
         break
-      case '3m':
-        from = subMonths(to, 3)
-        break
-      case '6m':
-        from = subMonths(to, 6)
-        break
-      case '1y':
-        from = subYears(to, 1)
-        break
-      case '5y':
-        from = subYears(to, 5)
-        break
       default:
         from = subDays(to, 1)
     }
@@ -157,11 +145,11 @@ export default function Page() {
           type: 'candlestick',
           data: stockData.map(item => [item.open, item.close, item.low, item.high]),
           itemStyle: {
-            color: 'hsl(var(--success))',
-            color0: 'hsl(var(--destructive))',
-            borderColor: 'hsl(var(--success))',
-            borderColor0: 'hsl(var(--destructive))'
-          }
+            color: '#ef4444', // Red color for decreasing (close < open)
+            color0: '#22c55e', // Green color for increasing (close > open)
+            borderColor: '#ef4444', // Red border for decreasing
+            borderColor0: '#22c55e', // Green border for increasing
+            }
         }
       ]
     }
@@ -172,7 +160,7 @@ export default function Page() {
       <header className="bg-white dark:bg-gray-800 p-4 flex justify-between items-center shadow-md">
         <div className="text-center flex-grow">
           <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">
-            Stock Chart
+            Trader Dashboard
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
             Today is {format(currentDate, "EEEE, do MMMM yyyy")}
@@ -212,10 +200,6 @@ export default function Page() {
                   <SelectItem value="1d">1 Day</SelectItem>
                   <SelectItem value="1w">1 Week</SelectItem>
                   <SelectItem value="1m">1 Month</SelectItem>
-                  <SelectItem value="3m">3 Months</SelectItem>
-                  <SelectItem value="6m">6 Months</SelectItem>
-                  <SelectItem value="1y">1 Year</SelectItem>
-                  <SelectItem value="5y">5 Years</SelectItem>
                   <SelectItem value="custom">Custom Range</SelectItem>
                 </SelectContent>
               </Select>

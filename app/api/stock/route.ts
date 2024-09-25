@@ -52,7 +52,7 @@ export async function GET(req: Request) {
         const queryOptions: any = {
             period1: new Date(from),
             period2: new Date(to),
-            interval: '1d',
+            interval: '1h',
         };
 
         console.log(`Fetching data for ${symbol} with options`, queryOptions);
